@@ -1,0 +1,52 @@
+name: 고추 시세 수집
+
+on:
+  schedule:
+    # 서안동 경매는 평일 오전이다. 시세표 등록 시각이 유동적이라 두 번 돌린다.
+    # UTC 기준이라 9시 = 한국 오후 6시, 12시 = 한국 밤 9시
+    - cron: "0 9,12 * * 1-5"
+  workflow_dispatch:        # 버튼으로 직접 돌릴 때
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 라이브러리 설치
+        run: pip install -r requirements.txt
+
+      - name: 시세 수집
+        id: collect
+        continue-on-error: true      # 실패해도 상태는 화면에 올려야 한다
+        run: python collect.py
+
+      - name: 저장
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/prices.json docs/prices.json
+          if git diff --staged --quiet; then
+            echo "바뀐 내용 없음"
+          else
+            git commit -m "시세 갱신 $(TZ=Asia/Seoul date +%Y-%m-%d\ %H:%M)"
+            git pull --rebase --autostash origin main
+            git push
+          fi
+
+      - name: 수집 실패 시 빨간불
+        if: steps.collect.outcome == 'failure'
+        run: |
+          echo "::error::시세 수집에 문제가 있다. sources/seoandong.py 를 확인할 것"
+          exit 1
