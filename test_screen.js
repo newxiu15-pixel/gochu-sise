@@ -13,8 +13,9 @@ const stub = `
 const body = script.replace(/fetch\("prices\.json[\s\S]*$/, "");
 
 const run = new Function(stub + body + `
-  return { state: state, series: series, cardHTML: cardHTML, verdictHTML: verdictHTML,
-           chartHTML: chartHTML, statHTML: statHTML, kindsAvailable: kindsAvailable, fmtDate: fmtDate,
+  return { state: state, series: series, heroHTML: heroHTML, verdictHTML: verdictHTML,
+           chartHTML: chartHTML, quadHTML: quadHTML, tableHTML: tableHTML, change: change,
+           kindsAvailable: kindsAvailable, fmtDate: fmtDate,
            alertHTML: alertHTML, checkedHTML: checkedHTML, weekdaysBetween: weekdaysBetween };
 `);
 const m = run();
@@ -42,10 +43,23 @@ const kinds = m.kindsAvailable();
 console.log(`\n== 표시 품종 (${kinds.length}) ==\n  ${kinds.join(" / ")}`);
 check("주력 품종이 맨 앞", kinds[0] === "화건 손꼭무(노지)", kinds[0]);
 
-console.log("\n== 오늘 시세 카드 ==");
-["화건 손꼭무(노지)", "화건 꼭무", "화건"].forEach((k) => {
-  console.log("  " + strip(m.cardHTML(k)));
+console.log("\n== 오늘 시세 (선택 품종 대형 표시) ==");
+["화건 손꼭무(노지)", "화건 꼭무"].forEach((k) => {
+  const h = strip(m.heroHTML(k));
+  console.log("  " + h);
+  check(`${k} 대형 표시`, /최고가/.test(h) && /최저가/.test(h) && /출하/.test(h) && !/NaN/.test(h));
 });
+
+console.log("\n== 오늘 전체 품종 표 ==");
+m.state.kind = "화건 손꼭무(노지)";
+const tbl = m.tableHTML(kinds);
+tbl.match(/<tr[^>]*>.*?<\/tr>/g).forEach((r) => {
+  const cells = r.match(/<t[dh][^>]*>(.*?)<\/t[dh]>/g).map((c) => strip(c));
+  console.log("  " + cells.map((c, i) => (i ? c.padStart(9) : c.padEnd(12))).join(""));
+});
+check("표에 전 품종이 다 들어감", tbl.match(/<tr/g).length === kinds.length + 1,
+      `${tbl.match(/<tr/g).length - 1}행 / 품종 ${kinds.length}개`);
+check("표에 등락 방향 표시", /▲|▼|―/.test(tbl));
 
 console.log("\n== 판단 문구 ==");
 kinds.slice(0, 4).forEach((k) => {
@@ -57,9 +71,9 @@ kinds.slice(0, 4).forEach((k) => {
 
 console.log("\n== 기간별 통계 ==");
 [7, 30, 90, 365].forEach((r) => {
-  const t = strip(m.statHTML("화건 손꼭무(노지)", r));
+  const t = strip(m.quadHTML("화건 손꼭무(노지)", r));
   console.log(`  ${String(r).padStart(3)}일: ${t}`);
-  check(`${r}일 통계`, /평균단가/.test(t) && !/NaN/.test(t));
+  check(`${r}일 통계`, /평균/.test(t) && !/NaN/.test(t) && !/-\s*최고/.test(t));
 });
 
 console.log("\n== 그래프 ==");
@@ -121,7 +135,7 @@ cases.forEach(([label, st, expectText, expectChecked]) => {
   check(label, ok, a || "(경고 없음)");
   if (a) console.log(`         → ${a}`);
   if (expectChecked && st) {
-    check(`${label}: 확인 표시`, c.indexOf("자동 확인 정상") === 0, c);
+    check(`${label}: 확인 표시`, /확인 완료/.test(c), c);
     console.log(`         → ${c}`);
   }
   if (a) check(`${label}: 아들에게 알리는 문구`, /아들에게/.test(a) || /공휴일/.test(a));
