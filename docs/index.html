@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ffffff">
+<title>고추 시세</title>
+<style>
+  :root {
+    --ink: #111;
+    --gray: #666;
+    --line: #ddd;
+    --up: #c62828;
+    --down: #1565c0;
+    --bg-soft: #f5f5f5;
+  }
+  * { box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    padding: 0 16px 48px;
+    background: #fff;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "맑은 고딕", sans-serif;
+    font-size: 18px;
+    line-height: 1.5;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+
+  header { padding: 20px 0 12px; }
+  .date { font-size: 30px; font-weight: 700; }
+  .market { font-size: 17px; color: var(--gray); margin-top: 2px; }
+
+  /* 오류 경고는 화면 맨 위에 크게 띄운다. 놓치면 안 되는 정보다. */
+  .alert {
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 16px 0 4px;
+  }
+  .alert.red {
+    background: #c62828;
+    color: #fff;
+    border: 3px solid #8e1c1c;
+  }
+  .alert.yellow {
+    background: #fff3cd;
+    color: #111;
+    border: 3px solid #e0a800;
+  }
+  .alert .tell {
+    display: block;
+    font-size: 19px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,.45);
+  }
+  .alert.yellow .tell { border-top-color: #e0a800; }
+  .alert .why {
+    display: block;
+    font-size: 15px;
+    font-weight: 500;
+    margin-top: 8px;
+    opacity: .85;
+  }
+
+  .checked { font-size: 15px; color: var(--gray); margin-top: 6px; }
+  .checked b { color: #1b5e20; font-weight: 700; }
+
+  .card {
+    border-top: 1px solid var(--line);
+    padding: 18px 0;
+  }
+  .name { font-size: 20px; font-weight: 700; }
+  .avg {
+    font-size: 46px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin: 4px 0 2px;
+  }
+  .avg .won { font-size: 26px; font-weight: 500; margin-left: 2px; }
+  .diff { font-size: 21px; font-weight: 700; }
+  .diff.up { color: var(--up); }
+  .diff.down { color: var(--down); }
+  .diff.same { color: var(--gray); }
+  .sub {
+    font-size: 17px;
+    color: var(--gray);
+    margin-top: 6px;
+  }
+
+  .verdict {
+    background: var(--bg-soft);
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 21px;
+    font-weight: 700;
+    line-height: 1.45;
+    margin: 20px 0;
+  }
+  .verdict .note { display: block; font-size: 17px; font-weight: 500; color: var(--gray); margin-top: 6px; }
+
+  details { border-top: 1px solid var(--line); }
+  summary {
+    padding: 16px 0;
+    font-size: 19px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▾ "; color: var(--gray); }
+  details[open] summary::before { content: "▴ "; }
+
+  h2 {
+    font-size: 21px;
+    margin: 32px 0 12px;
+    padding-top: 24px;
+    border-top: 3px solid var(--ink);
+  }
+
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tabs button {
+    flex: 1 1 0;
+    min-width: 72px;
+    padding: 13px 6px;
+    font-size: 18px;
+    font-family: inherit;
+    font-weight: 700;
+    color: var(--ink);
+    background: #fff;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .tabs button[aria-pressed="true"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+  .tabs.kinds button { font-size: 16px; }
+
+  .chart-wrap { margin-top: 6px; }
+  svg { width: 100%; height: auto; display: block; }
+  .chart-note { font-size: 16px; color: var(--gray); margin-top: 8px; }
+
+  table.stat { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 18px; }
+  table.stat th, table.stat td { padding: 10px 4px; border-bottom: 1px solid var(--line); text-align: right; }
+  table.stat th { text-align: left; font-weight: 500; color: var(--gray); }
+  table.stat td { font-weight: 700; }
+
+  footer { margin-top: 32px; font-size: 15px; color: var(--gray); }
+  .err { padding: 40px 0; font-size: 20px; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app"><p class="err">시세를 불러오는 중입니다…</p></div>
+
+<script>
+"use strict";
+
+// 아버지 주력 품종을 위에 고정한다. 나머지는 접어둔다.
+var MAIN = ["화건 손꼭무(노지)", "화건 손꼭무(하우스)", "화건 꼭무", "화건"];
+var ORDER = MAIN.concat(["청양(손꼭무, 꼭무)", "청양", "양건", "홍고추", "홍고추 손꼭무", "홍청양"]);
+var RANGES = [
+  { key: 7,   label: "일주일" },
+  { key: 30,  label: "한 달" },
+  { key: 90,  label: "석 달" },
+  { key: 365, label: "1년" }
+];
+var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+var state = { days: null, dates: [], marketName: "", updated: "", status: null, kind: null, range: 30 };
+
+function won(n) { return n == null ? "-" : n.toLocaleString("ko-KR"); }
+
+function fmtDate(iso) {
+  var d = new Date(iso + "T00:00:00+09:00");
+  return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + WEEKDAY[d.getDay()] + ")";
+}
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+
+// 경매는 평일에만 선다. 주말을 빼고 세야 헛경고가 안 뜬다.
+function weekdaysBetween(a, b) {
+  var d = new Date(a + "T00:00:00Z"), end = new Date(b + "T00:00:00Z"), n = 0;
+  while (d < end) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    var w = d.getUTCDay();
+    if (w !== 0 && w !== 6) n++;
+  }
+  return n;
+}
+
+function today() {
+  // 한국 시각 기준 오늘 날짜
+  return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+}
+
+// ── 최상단 경고 ─────────────────────────────────────────────
+// 아버지가 이상을 눈치채고 아들에게 알릴 수 있도록, 문제는 크고 빨갛게 띄운다.
+function alertHTML() {
+  var st = state.status || {};
+  var last = state.dates[state.dates.length - 1];
+  var lastCheck = st.checked ? st.checked.slice(0, 10) : null;
+  var tell = '<span class="tell">이 화면을 아들에게 보여주세요</span>';
+
+  // 1. 두 경로 모두 실패
+  if (st.ok === false) {
+    return '<div class="alert red">오류 발생 — 프로그램 수정이 필요합니다' + tell +
+           '<span class="why">시세를 가져오지 못했습니다. ' + (st.message || "") + "</span></div>";
+  }
+
+  // 2. 자동 확인 자체가 멈춤 (평일 이틀 넘게 확인 기록 없음)
+  if (lastCheck && weekdaysBetween(lastCheck, today()) >= 2) {
+    return '<div class="alert red">오류 발생 — 자동 확인이 멈췄습니다' + tell +
+           '<span class="why">마지막 확인 ' + fmtDate(lastCheck) + "</span></div>";
+  }
+
+  // 3. 게시판이 깨져 백업으로 버티는 중 (최고·최저가가 안 나온다)
+  if (st.board === false && st.backup === true) {
+    return '<div class="alert red">일부 오류 — 프로그램 수정이 필요합니다' + tell +
+           '<span class="why">평균가만 나옵니다. 최고가·최저가를 못 가져오고 있습니다.</span></div>';
+  }
+
+  // 4. 확인은 되는데 새 시세가 안 올라옴 (공휴일이거나 공판장 사정)
+  if (weekdaysBetween(last, today()) >= 3) {
+    return '<div class="alert yellow">새 시세가 안 올라오고 있습니다' +
+           '<span class="why">아래 값은 ' + fmtDate(last) + " 기준입니다. 공휴일이면 정상입니다.</span></div>";
+  }
+
+  return "";
+}
+
+// 정상일 때: 오늘 확인했다는 사실을 한 줄로 보여준다.
+function checkedHTML() {
+  var st = state.status || {};
+  if (!st.checked || st.ok === false) return "";
+  var d = st.checked.slice(0, 10);
+  var hm = st.checked.slice(11, 16);
+  var when = d === today() ? "오늘 " + hm : fmtDate(d) + " " + hm;
+  return '<div class="checked">자동 확인 <b>정상</b> · ' + when + " 확인함</div>";
+}
+
+// 해당 품종의 [날짜, 평균가] 목록. 값이 없는 날은 빠진다.
+function series(kind, withinDays) {
+  var last = state.dates[state.dates.length - 1];
+  var out = [];
+  state.dates.forEach(function (d) {
+    if (withinDays && daysBetween(d, last) > withinDays) return;
+    var v = state.days[d][kind];
+    if (v && v.avg != null) out.push([d, v.avg, v]);
+  });
+  return out;
+}
+
+function kindsAvailable() {
+  var seen = {};
+  state.dates.slice(-60).forEach(function (d) {
+    Object.keys(state.days[d]).forEach(function (k) { seen[k] = true; });
+  });
+  var list = ORDER.filter(function (k) { return seen[k]; });
+  Object.keys(seen).forEach(function (k) { if (list.indexOf(k) < 0) list.push(k); });
+  return list;
+}
+
+// ── 오늘 시세 카드 ───────────────────────────────────────────
+function cardHTML(kind) {
+  var s = series(kind, 0);
+  if (!s.length) return "";
+  var cur = s[s.length - 1];
+  var prev = s.length > 1 ? s[s.length - 2] : null;
+  var v = cur[2];
+
+  var diffHTML = '<div class="diff same">지난 경매 기록 없음</div>';
+  if (prev) {
+    var d = cur[1] - prev[1];
+    var cls = d > 0 ? "up" : d < 0 ? "down" : "same";
+    var mark = d > 0 ? "▲" : d < 0 ? "▼" : "―";
+    var word = d === 0 ? "같음" : (d > 0 ? "오름" : "내림");
+    diffHTML = '<div class="diff ' + cls + '">' + mark + " " + won(Math.abs(d)) + "원 " + word +
+               '<span style="font-weight:500;font-size:17px;color:var(--gray)"> (' + fmtDate(prev[0]).replace(/\(.\)/, "") + " " + won(prev[1]) + "원)</span></div>";
+  }
+
+  return '<div class="card">' +
+    '<div class="name">' + kind + "</div>" +
+    '<div class="avg">' + won(v.avg) + '<span class="won">원</span></div>' +
+    diffHTML +
+    '<div class="sub">최고 ' + won(v.high) + "원 · 최저 " + won(v.low) + "원<br>" +
+    "출하 " + won(v.volume) + v.unit + " · " + v.unit + "당 가격</div></div>";
+}
+
+// ── 낼지 말지 판단 한 줄 ─────────────────────────────────────
+function verdictHTML(kind) {
+  var s = series(kind, 30);
+  if (s.length < 3) return "";
+  var cur = s[s.length - 1][1];
+  var vals = s.map(function (x) { return x[1]; });
+  var sorted = vals.slice().sort(function (a, b) { return b - a; });
+  var rank = sorted.indexOf(cur) + 1;
+  var mean = Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length);
+  var gap = cur - mean;
+  var pct = Math.round(gap / mean * 1000) / 10;
+
+  var head;
+  if (rank === 1) head = "최근 한 달 중 가장 높습니다";
+  else if (rank <= 3) head = "최근 한 달 " + vals.length + "번 중 " + rank + "번째로 높습니다";
+  else if (rank > vals.length - 3) head = "최근 한 달 중 낮은 편입니다";
+  else head = "최근 한 달 " + vals.length + "번 중 " + rank + "번째입니다";
+
+  var tail = gap === 0 ? "한 달 평균과 같습니다"
+    : "한 달 평균 " + won(mean) + "원보다 " + won(Math.abs(gap)) + "원 " +
+      (gap > 0 ? "높습니다" : "낮습니다") + " (" + (gap > 0 ? "+" : "") + pct + "%)";
+
+  return '<div class="verdict">' + kind + " · " + head +
+         '<span class="note">' + tail + "</span></div>";
+}
+
+// ── 기간 통계 ───────────────────────────────────────────────
+function statHTML(kind, days) {
+  var s = series(kind, days);
+  if (!s.length) return '<p class="chart-note">이 기간에 거래 기록이 없습니다.</p>';
+  var vals = s.map(function (x) { return x[1]; });
+  var highs = s.map(function (x) { return x[2].high; }).filter(function (x) { return x != null; });
+  var lows = s.map(function (x) { return x[2].low; }).filter(function (x) { return x != null; });
+  var vols = s.map(function (x) { return x[2].volume || 0; });
+  var unit = s[s.length - 1][2].unit;
+  var mean = Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length);
+
+  return '<table class="stat">' +
+    "<tr><th>평균단가</th><td>" + won(mean) + "원</td></tr>" +
+    "<tr><th>가장 높았던 값</th><td>" + won(Math.max.apply(null, highs)) + "원</td></tr>" +
+    "<tr><th>가장 낮았던 값</th><td>" + won(Math.min.apply(null, lows)) + "원</td></tr>" +
+    "<tr><th>총 출하량</th><td>" + won(vols.reduce(function (a, b) { return a + b; }, 0)) + unit + "</td></tr>" +
+    "<tr><th>경매 일수</th><td>" + s.length + "일</td></tr></table>";
+}
+
+// ── 그래프 (외부 라이브러리 없이 SVG 직접 그림) ────────────────
+function chartHTML(kind, days) {
+  var s = series(kind, days);
+  if (s.length < 2) return '<p class="chart-note">그래프를 그릴 자료가 부족합니다.</p>';
+
+  var W = 560, H = 260, L = 62, R = 12, T = 16, B = 34;
+  var vals = s.map(function (x) { return x[1]; });
+  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  var pad = (hi - lo) * 0.15 || hi * 0.05 || 1;
+  lo = Math.max(0, lo - pad); hi = hi + pad;
+
+  var t0 = new Date(s[0][0]).getTime();
+  var t1 = new Date(s[s.length - 1][0]).getTime();
+  var span = t1 - t0 || 1;
+  var x = function (d) { return L + (new Date(d).getTime() - t0) / span * (W - L - R); };
+  var y = function (v) { return T + (1 - (v - lo) / (hi - lo)) * (H - T - B); };
+
+  // 경매가 열흘 넘게 비면 선을 끊는다. 이어 그리면 없던 흐름이 보인다.
+  var segs = [], cur = [];
+  s.forEach(function (p, i) {
+    if (i > 0 && daysBetween(s[i - 1][0], p[0]) > 10) { segs.push(cur); cur = []; }
+    cur.push(p);
+  });
+  segs.push(cur);
+
+  var paths = segs.filter(function (g) { return g.length > 1; }).map(function (g) {
+    return '<path d="' + g.map(function (p, i) {
+      return (i ? "L" : "M") + x(p[0]).toFixed(1) + " " + y(p[1]).toFixed(1);
+    }).join(" ") + '" fill="none" stroke="#111" stroke-width="2.5" stroke-linejoin="round"/>';
+  }).join("");
+
+  // 가로 눈금 4줄
+  var grid = "";
+  for (var i = 0; i <= 3; i++) {
+    var v = lo + (hi - lo) * i / 3, gy = y(v);
+    grid += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W - R) + '" y2="' + gy.toFixed(1) +
+            '" stroke="#eee" stroke-width="1"/>' +
+            '<text x="' + (L - 8) + '" y="' + (gy + 5).toFixed(1) + '" text-anchor="end" font-size="15" fill="#666">' +
+            Math.round(v / 1000) + "천</text>";
+  }
+
+  // 가로축은 처음과 끝 날짜만
+  var fmtShort = function (d) { var p = d.split("-"); return +p[1] + "/" + +p[2]; };
+  var axis = '<text x="' + L + '" y="' + (H - 8) + '" font-size="15" fill="#666">' + fmtShort(s[0][0]) + "</text>" +
+             '<text x="' + (W - R) + '" y="' + (H - 8) + '" text-anchor="end" font-size="15" fill="#666">' +
+             fmtShort(s[s.length - 1][0]) + "</text>";
+
+  // 마지막 값 강조
+  var last = s[s.length - 1];
+  var dot = '<circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[1]).toFixed(1) +
+            '" r="5" fill="#c62828"/>';
+
+  return '<div class="chart-wrap"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' +
+         kind + ' 시세 추이"><rect width="' + W + '" height="' + H + '" fill="#fff"/>' +
+         grid + paths + dot + axis + "</svg></div>" +
+         '<p class="chart-note">세로 눈금은 천원 단위입니다. 경매가 없던 기간은 선이 끊깁니다.</p>';
+}
+
+// ── 화면 조립 ───────────────────────────────────────────────
+function render() {
+  var kinds = kindsAvailable();
+  if (state.kind == null || kinds.indexOf(state.kind) < 0) state.kind = kinds[0];
+
+  var last = state.dates[state.dates.length - 1];
+  var html = alertHTML();  // 문제가 있으면 무조건 화면 맨 위
+
+  html += "<header><div class='date'>" + fmtDate(last) + " 시세</div>" +
+          "<div class='market'>" + state.marketName + "</div>" +
+          checkedHTML() + "</header>";
+
+  var mains = kinds.filter(function (k) { return MAIN.indexOf(k) >= 0; });
+  var rest = kinds.filter(function (k) { return MAIN.indexOf(k) < 0; });
+  html += mains.map(cardHTML).join("");
+  html += verdictHTML(state.kind);
+
+  if (rest.length) {
+    html += "<details><summary>다른 품종 보기 (" + rest.length + ")</summary>" +
+            rest.map(cardHTML).join("") + "</details>";
+  }
+
+  html += "<h2>기간별 시세</h2>";
+  html += "<div class='tabs kinds'>" + kinds.map(function (k) {
+    return "<button data-kind='" + k + "' aria-pressed='" + (k === state.kind) + "'>" + k + "</button>";
+  }).join("") + "</div>";
+  html += "<div class='tabs'>" + RANGES.map(function (r) {
+    return "<button data-range='" + r.key + "' aria-pressed='" + (r.key === state.range) + "'>" + r.label + "</button>";
+  }).join("") + "</div>";
+  html += chartHTML(state.kind, state.range);
+  html += statHTML(state.kind, state.range);
+
+  html += "<footer>자료: " + state.marketName + " 공식 시세표<br>" +
+          "갱신 " + state.updated.replace("T", " ").slice(0, 16) + " · 보유 " +
+          state.dates.length + "일치 (" + state.dates[0] + " 부터)</footer>";
+
+  var app = document.getElementById("app");
+  app.innerHTML = html;
+
+  app.querySelectorAll("[data-kind]").forEach(function (b) {
+    b.onclick = function () { state.kind = b.dataset.kind; render(); };
+  });
+  app.querySelectorAll("[data-range]").forEach(function (b) {
+    b.onclick = function () { state.range = +b.dataset.range; render(); };
+  });
+}
+
+fetch("prices.json?t=" + Date.now())
+  .then(function (r) { return r.json(); })
+  .then(function (store) {
+    var m = store.markets.seoandong;
+    if (!m || !Object.keys(m.days).length) throw new Error("자료 없음");
+    state.days = m.days;
+    state.dates = Object.keys(m.days).sort();
+    state.marketName = m.name;
+    state.updated = store.updated || "";
+    state.status = store.status || null;
+    render();
+  })
+  .catch(function (e) {
+    document.getElementById("app").innerHTML =
+      "<div class='alert red'>시세를 불러오지 못했습니다" +
+      "<span class='tell'>인터넷 연결을 확인하고 새로고침해 주세요.<br>" +
+      "그래도 안 되면 이 화면을 아들에게 보여주세요.</span>" +
+      "<span class='why'>" + e.message + "</span></div>";
+  });
+</script>
+</body>
+</html>
