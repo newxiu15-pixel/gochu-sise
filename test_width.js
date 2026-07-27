@@ -7,6 +7,8 @@ const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
 const stub = `
   var document = { getElementById: function () { return { innerHTML: "", querySelectorAll: function () { return []; } }; } };
   var fetch = function () { return { then: function () { return this; }, catch: function () { return this; } }; };
+  var localStorage = { getItem: function () { return null; }, setItem: function () {} };
+  var window = { scrollTo: function () {} };
 `;
 const run = new Function(stub + script.replace(/fetch\("prices\.json[\s\S]*$/, "") + `
   return { state: state, kindsAvailable: kindsAvailable, tableHTML: tableHTML,
@@ -19,7 +21,7 @@ const market = store.markets.seoandong;
 m.state.days = market.days;
 m.state.dates = Object.keys(market.days).sort();
 m.state.marketName = market.name;
-m.state.kind = "화건 손꼭무(노지)";
+m.state.kind = "화건 꼭무";
 
 // 글자 폭 어림값 (px). 한글은 글자크기와 거의 같고, 숫자·쉼표는 그보다 좁다.
 function textWidth(s, size) {

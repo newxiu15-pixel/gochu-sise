@@ -9,6 +9,8 @@ const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
 const stub = `
   var document = { getElementById: function () { return { innerHTML: "", querySelectorAll: function () { return []; } }; } };
   var fetch = function () { return { then: function () { return this; }, catch: function () { return this; } }; };
+  var localStorage = { getItem: function () { return null; }, setItem: function () {} };
+  var window = { scrollTo: function () {} };
 `;
 const body = script.replace(/fetch\("prices\.json[\s\S]*$/, "");
 
@@ -41,7 +43,7 @@ console.log(`  최신일 표시: ${m.fmtDate(m.state.dates[m.state.dates.length 
 
 const kinds = m.kindsAvailable();
 console.log(`\n== 표시 품종 (${kinds.length}) ==\n  ${kinds.join(" / ")}`);
-check("주력 품종이 맨 앞", kinds[0] === "화건 손꼭무(노지)", kinds[0]);
+check("자주 내는 품종이 맨 앞", kinds[0] === "화건 꼭무" && kinds[1] === "화건", kinds.slice(0,2).join(" → "));
 
 console.log("\n== 오늘 시세 (선택 품종 대형 표시) ==");
 ["화건 손꼭무(노지)", "화건 꼭무"].forEach((k) => {

@@ -83,6 +83,7 @@
   .hero-diff.up { color: var(--up); }
   .hero-diff.down { color: var(--down); }
   .hero-diff.same { color: var(--gray); }
+  .hero-unit { font-size: 16px; color: var(--gray); margin: -2px 0 8px; }
   .hero-prev { font-size: 15px; color: var(--gray); margin-top: 1px; }
 
   /* 가격끼리만 나란히 둔다. 물량은 성격이 달라 아래 단으로 내린다. */
@@ -177,7 +178,17 @@
   td.up { color: var(--up); font-weight: 700; }
   td.down { color: var(--down); font-weight: 700; }
   td.flat { color: var(--gray); font-size: 16px; }
-  .unit-note { font-size: 13px; color: var(--gray); margin-top: 8px; }
+  td i, .unit-note i {
+    font-style: normal;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--gray);
+    border-radius: 4px;
+    padding: 1px 5px;
+    vertical-align: 2px;
+  }
+  .unit-note { font-size: 13px; color: var(--gray); margin-top: 8px; line-height: 1.7; }
 
   /* ── 경고 ───────────────────────────────── */
   .alert { border-radius: 10px; padding: 16px; font-size: 20px; font-weight: 700; line-height: 1.4; margin-top: 16px; }
@@ -216,14 +227,23 @@ var FLAT = {
   "청양(손꼭무, 꼭무)": "청양 꼭무",
   "홍고추 손꼭무": "홍고추 꼭무"
 };
-// 아버지 주력 품종이 앞에 오게 고정한다.
-var ORDER = ["화건 손꼭무(노지)", "화건 손꼭무(하우스)", "화건 꼭무", "화건",
+// 아버지가 자주 내는 품종(꼭무·화건)을 맨 앞에 둔다.
+var ORDER = ["화건 꼭무", "화건", "화건 손꼭무(노지)", "화건 손꼭무(하우스)",
              "청양(손꼭무, 꼭무)", "청양", "양건", "홍고추", "홍고추 손꼭무", "홍청양"];
 var RANGES = [{ key: 7, label: "일주일" }, { key: 30, label: "한 달" },
               { key: 90, label: "석 달" }, { key: 365, label: "1년" }];
 var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
 var state = { days: null, dates: [], marketName: "", updated: "", status: null, kind: null, range: 30 };
+
+// 한번 고른 품종은 폰에 남겨둔다. 다음에 열면 바로 그 품종이 뜬다.
+function remember(key, value) {
+  try { localStorage.setItem("gochu." + key, value); } catch (e) { /* 저장이 막혀도 그냥 넘어간다 */ }
+}
+function recall(key) {
+  try { return localStorage.getItem("gochu." + key); } catch (e) { return null; }
+}
+function pick(kind) { state.kind = kind; remember("kind", kind); render(); }
 
 function won(n) { return n == null ? "-" : n.toLocaleString("ko-KR"); }
 function shortName(k) { return SHORT[k] || k; }
@@ -269,6 +289,12 @@ function kindsAvailable() {
   var list = ORDER.filter(function (k) { return seen[k]; });
   Object.keys(seen).forEach(function (k) { if (list.indexOf(k) < 0) list.push(k); });
   return list;
+}
+
+// 이 품종이 근 단위인지 kg 단위인지
+function unitOf(kind) {
+  var s = series(kind, 0);
+  return s.length ? s[s.length - 1][2].unit : "근";
 }
 
 // 직전 경매일 대비 등락
@@ -339,6 +365,7 @@ function heroHTML(kind) {
   return '<div class="hero">' +
     '<div class="hero-kind">' + kind + "</div>" + stale +
     '<div class="hero-price">' + won(v.avg) + "<span>원</span></div>" +
+    '<div class="hero-unit">1' + v.unit + "당 평균가</div>" +
     diff +
     // 가격끼리 나란히
     '<div class="pair">' +
@@ -463,21 +490,27 @@ function tableHTML(kinds) {
       cls = c.diff > 0 ? "up" : "down";
       txt = (c.diff > 0 ? "▲" : "▼") + won(Math.abs(c.diff));
     }
+    // 단위가 다른 품종(홍고추는 kg)만 이름 뒤에 밝힌다. 안 그러면 싼 값으로 오해한다.
+    var name = flatName(k) + (v.unit !== "근" ? ' <i>' + v.unit + "</i>" : "");
     // 비교에 필요한 건 평균과 등락이다. 최고·최저는 품종을 고르면 위에 크게 나온다.
     return "<tr data-row='" + k + "'" + (k === state.kind ? ' class="on"' : "") + "><td>" +
-           flatName(k) + "</td><td>" + won(v.avg) + '</td><td class="' + cls + '">' + txt + "</td></tr>";
+           name + "</td><td>" + won(v.avg) + '</td><td class="' + cls + '">' + txt + "</td></tr>";
   }).join("");
 
-  return "<table><thead><tr><th>품종</th><th>평균가</th><th>등락</th></tr></thead>" +
+  return "<table><thead><tr><th>품종</th><th>1근당 평균가</th><th>등락</th></tr></thead>" +
          "<tbody>" + rows + "</tbody></table>" +
          '<p class="unit-note">줄을 누르면 그 품종의 최고·최저와 그래프를 봅니다.<br>' +
-         "건고추는 근당, 홍고추는 kg당 가격입니다.</p>";
+         "<i>kg</i> 표시가 붙은 홍고추만 kg당 가격입니다.</p>";
 }
 
 // ── 조립 ────────────────────────────────────────────────────
 function render() {
   var kinds = kindsAvailable();
-  if (state.kind == null || kinds.indexOf(state.kind) < 0) state.kind = kinds[0];
+  if (state.kind == null || kinds.indexOf(state.kind) < 0) {
+    // 지난번에 보던 품종이 있으면 그것부터, 없으면 주력 품종
+    var saved = recall("kind");
+    state.kind = saved && kinds.indexOf(saved) >= 0 ? saved : kinds[0];
+  }
   var last = state.dates[state.dates.length - 1];
 
   var html =
@@ -494,7 +527,7 @@ function render() {
 
     "<section>" + verdictHTML(state.kind) + "</section>" +
 
-    "<section><div class='label'>시세 흐름</div><div class='ranges'>" +
+    "<section><div class='label'>시세 흐름 · 1" + unitOf(state.kind) + "당</div><div class='ranges'>" +
     RANGES.map(function (r) {
       return "<button data-range='" + r.key + "' aria-pressed='" + (r.key === state.range) + "'>" + r.label + "</button>";
     }).join("") + "</div>" + chartHTML(state.kind, state.range) + quadHTML(state.kind, state.range) + "</section>" +
@@ -507,16 +540,15 @@ function render() {
   var app = document.getElementById("app");
   app.innerHTML = html;
   app.querySelectorAll("[data-kind]").forEach(function (b) {
-    b.onclick = function () { state.kind = b.dataset.kind; render(); };
+    b.onclick = function () { pick(b.dataset.kind); };
   });
   app.querySelectorAll("[data-range]").forEach(function (b) {
-    b.onclick = function () { state.range = +b.dataset.range; render(); };
+    b.onclick = function () { state.range = +b.dataset.range; remember("range", state.range); render(); };
   });
   // 표에서 줄을 눌러도 그 품종으로 바뀐다
   app.querySelectorAll("[data-row]").forEach(function (tr) {
     tr.onclick = function () {
-      state.kind = tr.dataset.row;
-      render();
+      pick(tr.dataset.row);
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
   });
@@ -532,6 +564,8 @@ fetch("prices.json?t=" + Date.now())
     state.marketName = m.name;
     state.updated = store.updated || "";
     state.status = store.status || null;
+    var savedRange = +recall("range");
+    if (RANGES.some(function (r) { return r.key === savedRange; })) state.range = savedRange;
     render();
   })
   .catch(function (e) {
