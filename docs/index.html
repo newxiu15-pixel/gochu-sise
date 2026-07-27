@@ -31,10 +31,24 @@
   }
 
   /* ── 1. 날짜 ───────────────────────────── */
+  /* 시세 날짜와 확인 날짜를 나란히 둔다. 두 날짜를 견주면 갱신 여부가 바로 보인다. */
   header { padding: 22px 0 4px; }
-  .date { font-size: 27px; font-weight: 700; letter-spacing: -0.5px; }
-  .sub-head { font-size: 15px; color: var(--gray); margin-top: 3px; }
-  .sub-head b { color: #1b5e20; }
+  .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .date { font-size: 27px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  .stamp {
+    flex: none;
+    text-align: right;
+    font-size: 12px;
+    line-height: 1.35;
+    padding: 3px 8px;
+    border-radius: 7px;
+    border: 1.5px solid var(--line);
+    color: var(--gray);
+  }
+  .stamp b { display: block; font-size: 13px; font-weight: 700; }
+  .stamp.fresh { border-color: #1b5e20; color: #1b5e20; }
+  .stamp.stale { border-color: #e0a800; color: #a07800; background: #fffdf3; }
+  .sub-head { font-size: 15px; color: var(--gray); margin-top: 4px; }
 
   /* ── 구역 나누기 ───────────────────────── */
   section { margin-top: 26px; }
@@ -67,7 +81,7 @@
     color: #fff;
   }
 
-  /* ── 3. 오늘 값 ─────────────────────────── */
+  /* ── 3. 그날 값 ─────────────────────────── */
   .hero { border: 2px solid var(--ink); border-radius: 12px; padding: 18px 16px 0; }
   .hero-kind { font-size: 19px; font-weight: 700; }
   .stale-note { font-size: 15px; color: var(--up); font-weight: 700; margin-top: 2px; }
@@ -164,6 +178,17 @@
   }
   .count b { color: var(--ink); }
 
+  .empty {
+    padding: 26px 16px;
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 17px;
+    color: var(--gray);
+    line-height: 1.5;
+  }
+  .empty span { display: block; margin-top: 6px; font-weight: 700; color: var(--ink); }
+
   /* ── 6. 전체 품종 ───────────────────────── */
   /* 좁은 폰에서 눈이 가로로 헤매지 않게 세 칸까지만 둔다. */
   table { width: 100%; border-collapse: collapse; }
@@ -254,6 +279,12 @@ function fmtDate(iso) {
   return (d.getMonth() + 1) + "월 " + d.getDate() + "일 (" + WEEKDAY[d.getDay()] + ")";
 }
 
+// 요일을 뺀 짧은 날짜. 주말·공휴일에 '오늘'이라고 쓰면 틀린 말이 되므로 어디서나 날짜로 적는다.
+function fmtDay(iso) {
+  var d = new Date(iso + "T00:00:00+09:00");
+  return (d.getMonth() + 1) + "월 " + d.getDate() + "일";
+}
+
 function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
 
 // 경매는 평일에만 선다. 주말을 빼고 세야 헛경고가 안 뜬다.
@@ -268,6 +299,17 @@ function weekdaysBetween(a, b) {
 }
 
 function today() { return new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10); }
+
+// 며칠 전인지에 따라 말을 고른다. '지난 경매'처럼 뭉뚱그리면 언제인지 알 수 없다.
+function relDay(iso) {
+  var gap = daysBetween(iso, today());
+  if (gap === 0) return fmtDay(iso);
+  if (gap === 1) return "어제 " + fmtDay(iso);
+  if (gap === 2) return "그저께 " + fmtDay(iso);
+  // 해가 넘어간 값은 연도를 밝힌다. 안 그러면 작년 10월을 올해로 본다.
+  if (iso.slice(0, 4) !== today().slice(0, 4)) return iso.slice(0, 4) + "년 " + fmtDay(iso);
+  return fmtDate(iso);
+}
 
 // 해당 품종의 [날짜, 평균가, 원본] 목록. 거래가 없던 날은 빠진다.
 function series(kind, withinDays) {
@@ -331,15 +373,19 @@ function alertHTML() {
   return "";
 }
 
-function checkedHTML() {
+// 시세 날짜 옆에 붙는 확인 도장. 언제 확인했는지가 한눈에 보여야 갱신 여부를 안다.
+function stampHTML() {
   var st = state.status || {};
-  if (!st.checked || st.ok === false) return "";
+  if (!st.checked) return '<div class="stamp stale">확인 기록<b>없음</b></div>';
+
   var d = st.checked.slice(0, 10), hm = st.checked.slice(11, 16);
-  return state.marketName + " · " + (d === today() ? "오늘 " + hm : fmtDate(d) + " " + hm) +
-         " <b>확인 완료</b>";
+  var md = (+d.slice(5, 7)) + "/" + (+d.slice(8, 10));
+  // 확인이 평일 하루도 안 밀렸으면 초록, 밀렸으면 노랑
+  var cls = weekdaysBetween(d, today()) < 1 ? "fresh" : "stale";
+  return '<div class="stamp ' + cls + '">확인<b>' + md + " " + hm + "</b></div>";
 }
 
-// ── 오늘 값 (선택한 품종) ────────────────────────────────────
+// ── 그날 값 (선택한 품종) ────────────────────────────────────
 function heroHTML(kind) {
   var s = series(kind, 0);
   if (!s.length) return '<div class="hero"><div class="hero-kind">' + kind +
@@ -347,19 +393,24 @@ function heroHTML(kind) {
   var v = s[s.length - 1][2];
   var c = change(kind);
 
-  // 오늘 안 나온 품종이면 언제 값인지 밝힌다. 안 그러면 옛 값을 오늘 값으로 본다.
+  // 그날 경매에 없던 품종이면 언제 값인지 밝힌다. 안 그러면 옛 값을 최신 값으로 본다.
   var soldDate = s[s.length - 1][0];
   var stale = soldDate !== state.dates[state.dates.length - 1]
-    ? '<div class="stale-note">' + fmtDate(soldDate) + " 마지막 거래 · 오늘은 안 나왔습니다</div>" : "";
+    ? '<div class="stale-note">' + fmtDay(state.dates[state.dates.length - 1]) +
+      " 경매에 없음 · 아래는 " + fmtDay(soldDate) + " 값</div>" : "";
 
-  var diff = '<div class="hero-diff same">지난 경매 기록 없음</div>';
-  if (c) {
+  var diff = '<div class="hero-diff same">견줄 이전 경매가 없습니다</div>';
+  // 직전 거래가 보름도 더 전이면 견주는 것이 뜻이 없다. 오름·내림으로 적으면 오해한다.
+  if (c && daysBetween(c.prevDate, soldDate) > 15) {
+    diff = '<div class="hero-diff same">오랜만에 나온 경매입니다</div>' +
+           '<div class="hero-prev">직전은 ' + relDay(c.prevDate) + " " + won(c.prev) + "원</div>";
+  } else if (c) {
     var cls = c.diff > 0 ? "up" : c.diff < 0 ? "down" : "same";
     var mark = c.diff > 0 ? "▲" : c.diff < 0 ? "▼" : "―";
     var word = c.diff === 0 ? "변동 없음" : won(Math.abs(c.diff)) + "원 " + (c.diff > 0 ? "오름" : "내림");
-    // 등락과 지난 값은 결이 다르니 줄을 나눈다. 한 줄에 넣으면 좁은 폰에서 넘친다.
+    // 등락과 견준 값은 결이 다르니 줄을 나눈다. 한 줄에 넣으면 좁은 폰에서 넘친다.
     diff = '<div class="hero-diff ' + cls + '">' + mark + " " + word + "</div>" +
-           '<div class="hero-prev">지난 경매 ' + won(c.prev) + "원</div>";
+           '<div class="hero-prev">' + relDay(c.prevDate) + " " + won(c.prev) + "원과 견줌</div>";
   }
 
   return '<div class="hero">' +
@@ -373,14 +424,19 @@ function heroHTML(kind) {
       "<div><b>" + won(v.low) + "</b><span>최저가</span></div>" +
     "</div>" +
     // 물량은 결이 다르니 아래 단으로
-    '<div class="volume"><span>오늘 출하량</span><b>' + won(v.volume) + " " + v.unit + "</b></div>" +
+    '<div class="volume"><span>출하량</span><b>' + won(v.volume) + " " + v.unit + "</b></div>" +
   "</div>";
 }
 
 // ── 판단 ────────────────────────────────────────────────────
 function verdictHTML(kind) {
   var s = series(kind, 30);
-  if (s.length < 3) return "";
+  // 값이 두세 개뿐이면 순위를 매겨봐야 뜻이 없다. 왜 판단을 못 하는지 밝힌다.
+  if (s.length < 3) {
+    return '<div class="verdict"><div class="line1">아직 견줄 자료가 모자랍니다</div>' +
+           '<div class="line2">최근 한 달 ' + kind + " 경매가 " + s.length +
+           "번뿐입니다. 경매가 쌓이면 높은지 낮은지 알려드립니다.</div></div>";
+  }
   var cur = s[s.length - 1][1];
   var vals = s.map(function (x) { return x[1]; });
   var rank = vals.slice().sort(function (a, b) { return b - a; }).indexOf(cur) + 1;
@@ -388,11 +444,12 @@ function verdictHTML(kind) {
   var gap = cur - mean;
   var pct = Math.round(gap / mean * 1000) / 10;
 
+  // 무엇의 몇 번인지 밝힌다. 숫자만 있으면 무슨 말인지 알 수 없다.
   var head;
-  if (rank === 1) head = "최근 한 달 중 가장 높습니다";
-  else if (rank <= 3) head = "최근 한 달 " + vals.length + "번 중 " + rank + "번째로 높습니다";
-  else if (rank > vals.length - 3) head = "최근 한 달 중 낮은 편입니다";
-  else head = "최근 한 달 " + vals.length + "번 중 " + rank + "번째입니다";
+  if (rank === 1) head = "한 달간 경매 " + vals.length + "번 중 가장 높습니다";
+  else if (rank <= 3) head = "한 달간 경매 " + vals.length + "번 중 " + rank + "번째로 높습니다";
+  else if (rank > vals.length - 3) head = "한 달간 경매 " + vals.length + "번 중 " + rank + "번째로 낮은 편입니다";
+  else head = "한 달간 경매 " + vals.length + "번 중 " + rank + "번째입니다";
 
   var tail = gap === 0 ? "한 달 평균과 같습니다"
     : "한 달 평균 " + won(mean) + "원보다 <b>" + won(Math.abs(gap)) + "원 " +
@@ -405,7 +462,14 @@ function verdictHTML(kind) {
 // ── 그래프 (외부 라이브러리 없이 SVG 직접 그림) ────────────────
 function chartHTML(kind, days) {
   var s = series(kind, days);
-  if (s.length < 2) return '<p class="unit-note">그래프를 그릴 자료가 부족합니다.</p>';
+  // 점이 하나뿐이면 선을 그릴 수 없다. 왜 안 나오는지, 어떻게 하면 보이는지 알려준다.
+  if (s.length < 2) {
+    var span = RANGES.filter(function (r) { return r.key === days; })[0];
+    var label = span ? span.label : days + "일";
+    return '<div class="empty">' + label + " 안에 " + kind + " 경매가 " +
+           (s.length ? "한 번뿐이라" : "없어") + " 흐름을 그릴 수 없습니다." +
+           "<span>기간을 더 길게 눌러 보세요.</span></div>";
+  }
 
   var W = 480, H = 210, L = 54, R = 10, T = 12, B = 28;
   var vals = s.map(function (x) { return x[1]; });
@@ -432,18 +496,49 @@ function chartHTML(kind, days) {
     }).join(" ") + '" fill="none" stroke="#111" stroke-width="2.2" stroke-linejoin="round"/>';
   }).join("");
 
+  // 값 폭이 좁을 때 천 단위로 반올림하면 눈금이 다 같은 숫자가 된다. 그때는 소수로 적는다.
+  var fmtY = (hi - lo) >= 4000
+    ? function (v) { return Math.round(v / 1000) + "천"; }
+    : function (v) { return (Math.round(v / 100) / 10).toFixed(1) + "천"; };
+
   var grid = "";
   for (var i = 0; i <= 3; i++) {
     var v = lo + (hi - lo) * i / 3, gy = y(v);
     grid += '<line x1="' + L + '" y1="' + gy.toFixed(1) + '" x2="' + (W - R) + '" y2="' + gy.toFixed(1) +
             '" stroke="#eee"/><text x="' + (L - 7) + '" y="' + (gy + 5).toFixed(1) +
-            '" text-anchor="end" font-size="14" fill="#777">' + Math.round(v / 1000) + "천</text>";
+            '" text-anchor="end" font-size="14" fill="#777">' + fmtY(v) + "</text>";
   }
 
-  var f = function (d) { var p = d.split("-"); return +p[1] + "/" + +p[2]; };
-  var axis = '<text x="' + L + '" y="' + (H - 6) + '" font-size="14" fill="#777">' + f(s[0][0]) + "</text>" +
-             '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end" font-size="14" fill="#777">' +
-             f(s[s.length - 1][0]) + "</text>";
+  // 가로축 눈금. 양 끝만 있으면 석 달·1년 그래프에서 중간이 언제인지 알 수 없다.
+  // 1년은 날짜까지 적으면 빽빽해서 월만 적는다.
+  var byMonth = days >= 180;
+  var f = function (d) {
+    var p = d.split("-");
+    return byMonth ? +p[1] + "월" : +p[1] + "/" + +p[2];
+  };
+
+  var tickCount = days <= 7 ? 3 : days <= 90 ? 4 : 5;
+  var seen = {}, axis = "";
+  for (var t = 0; t < tickCount; t++) {
+    var target = t0 + span * t / (tickCount - 1);
+    // 눈금 자리에서 가장 가까운 실제 경매일을 찍는다
+    var near = s.reduce(function (a, b) {
+      return Math.abs(new Date(b[0]) - target) < Math.abs(new Date(a[0]) - target) ? b : a;
+    });
+    var text = f(near[0]);
+    if (seen[text]) continue;      // 같은 달이 겹치면 한 번만
+    seen[text] = 1;
+
+    var tx = x(near[0]);
+    var anchor = t === 0 ? "start" : t === tickCount - 1 ? "end" : "middle";
+    if (t === 0) tx = L;
+    if (t === tickCount - 1) tx = W - R;
+
+    axis += '<line x1="' + tx.toFixed(1) + '" y1="' + T + '" x2="' + tx.toFixed(1) + '" y2="' +
+            (H - B) + '" stroke="#f2f2f2"/>' +
+            '<text x="' + tx.toFixed(1) + '" y="' + (H - 6) + '" text-anchor="' + anchor +
+            '" font-size="14" fill="#777">' + text + "</text>";
+  }
 
   var last = s[s.length - 1];
   var dot = '<circle cx="' + x(last[0]).toFixed(1) + '" cy="' + y(last[1]).toFixed(1) + '" r="4.5" fill="#c62828"/>';
@@ -463,6 +558,7 @@ function quadHTML(kind, days) {
   var mean = Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length);
 
   var span = RANGES.filter(function (r) { return r.key === days; })[0];
+  var label = span ? span.label : days + "일";
 
   // 가격 셋은 나란히, 경매 횟수는 성격이 달라 아래 단으로
   return '<div class="quad">' +
@@ -470,19 +566,18 @@ function quadHTML(kind, days) {
     "<div><b>" + won(highs.length ? Math.max.apply(null, highs) : null) + "</b><span>최고</span></div>" +
     "<div><b>" + won(lows.length ? Math.min.apply(null, lows) : null) + "</b><span>최저</span></div>" +
     "</div>" +
-    '<div class="count"><span>' + (span ? span.label : days + "일") +
-    " 동안 경매</span><b>" + s.length + "일</b></div>";
+    '<div class="count"><span>' + label + "간 이 품종이 나온 경매</span><b>" + s.length + "번</b></div>";
 }
 
-// ── 오늘 전체 품종 ───────────────────────────────────────────
+// ── 그날 전 품종 ───────────────────────────────────────────
 function tableHTML(kinds) {
   var last = state.dates[state.dates.length - 1];
   var rows = kinds.map(function (k) {
     var v = state.days[last][k];
-    // 오늘 안 나온 품종도 줄은 남긴다. 빠지면 버튼 목록과 어긋난다.
+    // 그날 경매에 없던 품종도 줄은 남긴다. 빠지면 버튼 목록과 어긋난다.
     if (!v) {
       return "<tr data-row='" + k + "'" + (k === state.kind ? ' class="on"' : "") + "><td>" + flatName(k) +
-             '</td><td colspan="2" class="flat">오늘 거래 없음</td></tr>';
+             '</td><td colspan="2" class="flat">경매 없음</td></tr>';
     }
     var c = change(k);
     var cls = "flat", txt = "―";
@@ -503,6 +598,20 @@ function tableHTML(kinds) {
          "<i>kg</i> 표시가 붙은 홍고추만 kg당 가격입니다.</p>";
 }
 
+function flowHTML() {
+  return chartHTML(state.kind, state.range) + quadHTML(state.kind, state.range);
+}
+
+// 기간을 바꿀 때 화면 전체를 다시 그리면 보던 자리가 흔들린다. 그래프 칸만 갈아 끼운다.
+function setRange(r) {
+  state.range = r;
+  remember("range", r);
+  document.getElementById("flow").innerHTML = flowHTML();
+  document.querySelectorAll("[data-range]").forEach(function (b) {
+    b.setAttribute("aria-pressed", +b.dataset.range === r);
+  });
+}
+
 // ── 조립 ────────────────────────────────────────────────────
 function render() {
   var kinds = kindsAvailable();
@@ -514,8 +623,9 @@ function render() {
   var last = state.dates[state.dates.length - 1];
 
   var html =
-    "<header><div class='date'>" + fmtDate(last) + "</div>" +
-    "<div class='sub-head'>" + checkedHTML() + "</div></header>" +
+    "<header><div class='head-row'><div class='date'>" + fmtDate(last) + " 시세</div>" +
+    stampHTML() + "</div>" +
+    "<div class='sub-head'>" + state.marketName + "</div></header>" +
     alertHTML() +
 
     "<section><div class='label'>품종 고르기</div><div class='picker'>" +
@@ -523,16 +633,16 @@ function render() {
       return "<button data-kind='" + k + "' aria-pressed='" + (k === state.kind) + "'>" + shortName(k) + "</button>";
     }).join("") + "</div></section>" +
 
-    "<section><div class='label'>오늘 시세</div>" + heroHTML(state.kind) + "</section>" +
+    "<section><div class='label'>" + fmtDay(last) + " 시세</div>" + heroHTML(state.kind) + "</section>" +
 
     "<section>" + verdictHTML(state.kind) + "</section>" +
 
     "<section><div class='label'>시세 흐름 · 1" + unitOf(state.kind) + "당</div><div class='ranges'>" +
     RANGES.map(function (r) {
       return "<button data-range='" + r.key + "' aria-pressed='" + (r.key === state.range) + "'>" + r.label + "</button>";
-    }).join("") + "</div>" + chartHTML(state.kind, state.range) + quadHTML(state.kind, state.range) + "</section>" +
+    }).join("") + "</div><div id='flow'>" + flowHTML() + "</div></section>" +
 
-    "<section><div class='label'>오늘 전체 품종</div>" + tableHTML(kinds) + "</section>" +
+    "<section><div class='label'>" + fmtDay(last) + " 전 품종</div>" + tableHTML(kinds) + "</section>" +
 
     "<footer>자료 : " + state.marketName + " 공식 시세표<br>" +
     "보유 " + state.dates.length + "일치 (" + state.dates[0] + " 부터)</footer>";
@@ -543,7 +653,7 @@ function render() {
     b.onclick = function () { pick(b.dataset.kind); };
   });
   app.querySelectorAll("[data-range]").forEach(function (b) {
-    b.onclick = function () { state.range = +b.dataset.range; remember("range", state.range); render(); };
+    b.onclick = function () { setRange(+b.dataset.range); };
   });
   // 표에서 줄을 눌러도 그 품종으로 바뀐다
   app.querySelectorAll("[data-row]").forEach(function (tr) {

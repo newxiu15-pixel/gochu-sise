@@ -3,7 +3,7 @@
 const fs = require("fs");
 
 const html = fs.readFileSync("docs/index.html", "utf8");
-const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
+const script = html.match(/<script>\r?\n([\s\S]*?)<\/script>/)[1];
 
 // DOM과 통신 부분만 흉내낸다. 계산 로직은 원본 그대로 돈다.
 const stub = `
@@ -18,7 +18,7 @@ const run = new Function(stub + body + `
   return { state: state, series: series, heroHTML: heroHTML, verdictHTML: verdictHTML,
            chartHTML: chartHTML, quadHTML: quadHTML, tableHTML: tableHTML, change: change,
            kindsAvailable: kindsAvailable, fmtDate: fmtDate,
-           alertHTML: alertHTML, checkedHTML: checkedHTML, weekdaysBetween: weekdaysBetween };
+           alertHTML: alertHTML, stampHTML: stampHTML, weekdaysBetween: weekdaysBetween };
 `);
 const m = run();
 
@@ -68,7 +68,8 @@ kinds.slice(0, 4).forEach((k) => {
   m.state.kind = k;
   const v = strip(m.verdictHTML(k));
   console.log("  " + (v || "(자료 부족)"));
-  if (v) check(`${k} 판단 문구`, /최근 한 달/.test(v) && /평균/.test(v));
+  // 무엇의 몇 번인지(경매) 주어가 들어 있어야 한다
+  if (v) check(`${k} 판단 문구`, /한 달간 경매 \d+번 중/.test(v) && /한 달 평균/.test(v));
 });
 
 console.log("\n== 기간별 통계 ==");
@@ -132,12 +133,12 @@ const cases = [
 cases.forEach(([label, st, expectText, expectChecked]) => {
   m.state.status = st;
   const a = strip(m.alertHTML());
-  const c = strip(m.checkedHTML());
+  const c = strip(m.stampHTML());
   const ok = expectText ? a.indexOf(expectText) === 0 : a === "";
   check(label, ok, a || "(경고 없음)");
   if (a) console.log(`         → ${a}`);
   if (expectChecked && st) {
-    check(`${label}: 확인 표시`, /확인 완료/.test(c), c);
+    check(`${label}: 확인 도장`, /^확인 \d/.test(c), c);
     console.log(`         → ${c}`);
   }
   if (a) check(`${label}: 아들에게 알리는 문구`, /아들에게/.test(a) || /공휴일/.test(a));
@@ -159,7 +160,7 @@ check("주말 제외 계산", m.weekdaysBetween("2026-07-24", "2026-07-27") === 
 m.state.status = store.status;
 console.log("\n== 지금 실제 상태 ==");
 console.log("  경고: " + (strip(m.alertHTML()) || "없음 (정상)"));
-console.log("  표시: " + strip(m.checkedHTML()));
+console.log("  표시: " + strip(m.stampHTML()));
 check("현재 상태 정상", strip(m.alertHTML()) === "");
 
 console.log(fail === 0 ? "\n전부 통과" : `\n실패 ${fail}건`);

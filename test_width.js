@@ -3,7 +3,7 @@
 const fs = require("fs");
 
 const html = fs.readFileSync("docs/index.html", "utf8");
-const script = html.match(/<script>\n([\s\S]*?)<\/script>/)[1];
+const script = html.match(/<script>\r?\n([\s\S]*?)<\/script>/)[1];
 const stub = `
   var document = { getElementById: function () { return { innerHTML: "", querySelectorAll: function () { return []; } }; } };
   var fetch = function () { return { then: function () { return this; }, catch: function () { return this; } }; };
