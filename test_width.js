@@ -51,7 +51,13 @@ console.log(`== 화면 폭 ${PHONE}px 기준 (본문 ${BODY}px) ==\n`);
 
 const kinds = m.kindsAvailable();
 
-console.log("-- 품종 버튼 (3칸) --");
+console.log("-- 머리글 (날짜 + 확인 도장 한 줄) --");
+const dateW = textWidth("7월 27일 (월)", 24);
+const stampW = Math.max(textWidth("확인", 13), textWidth("7/27 22:17", 14)) + 18 + 6; // 좌우 여백 9px, 테두리 3px
+console.log(`  날짜 ${dateW}px · 도장 ${stampW}px · 간격 8px`);
+check("한 줄에 들어감", dateW + stampW + 8, BODY);
+
+console.log("\n-- 품종 버튼 (3칸) --");
 const cell = Math.floor((BODY - 14) / 3);   // gap 7px씩
 kinds.forEach((k) => {
   const lines = m.shortName(k).split("<br>");

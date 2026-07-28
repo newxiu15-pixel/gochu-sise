@@ -33,21 +33,23 @@
   /* ── 1. 날짜 ───────────────────────────── */
   /* 시세 날짜와 확인 날짜를 나란히 둔다. 두 날짜를 견주면 갱신 여부가 바로 보인다. */
   header { padding: 22px 0 4px; }
-  .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .date { font-size: 27px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.2; }
+  /* 도장 테두리를 굵히면서 좁은 폰(320px)에서 한 줄에 안 들어가 날짜를 줄였다. */
+  .head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .date { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; line-height: 1.25; }
   .stamp {
     flex: none;
-    text-align: right;
-    font-size: 12px;
-    line-height: 1.35;
-    padding: 3px 8px;
-    border-radius: 7px;
-    border: 1.5px solid var(--line);
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
+    padding: 5px 9px;
+    border-radius: 8px;
+    border: 3px solid var(--line);    /* 갱신 여부가 한눈에 들어오게 굵게 */
     color: var(--gray);
   }
-  .stamp b { display: block; font-size: 13px; font-weight: 700; }
-  .stamp.fresh { border-color: #1b5e20; color: #1b5e20; }
-  .stamp.stale { border-color: #e0a800; color: #a07800; background: #fffdf3; }
+  .stamp b { display: block; font-size: 14px; font-weight: 700; }
+  .stamp.fresh { border-color: #1b5e20; color: #1b5e20; background: #f1f8f2; }
+  .stamp.stale { border-color: #e0a800; color: #8a6600; background: #fff8e1; }
   .sub-head { font-size: 15px; color: var(--gray); margin-top: 4px; }
 
   /* ── 구역 나누기 ───────────────────────── */
@@ -623,9 +625,9 @@ function render() {
   var last = state.dates[state.dates.length - 1];
 
   var html =
-    "<header><div class='head-row'><div class='date'>" + fmtDate(last) + " 시세</div>" +
+    "<header><div class='head-row'><div class='date'>" + fmtDate(last) + "</div>" +
     stampHTML() + "</div>" +
-    "<div class='sub-head'>" + state.marketName + "</div></header>" +
+    "<div class='sub-head'>" + state.marketName + " 경매</div></header>" +
     alertHTML() +
 
     "<section><div class='label'>품종 고르기</div><div class='picker'>" +
