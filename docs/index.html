@@ -195,11 +195,12 @@
   /* ── 6. 전체 품종 ───────────────────────── */
   /* 좁은 폰에서 눈이 가로로 헤매지 않게 세 칸까지만 둔다. */
   table { width: 100%; border-collapse: collapse; }
-  th, td { padding: 13px 2px; font-size: 18px; text-align: right; }
-  th { font-size: 14px; font-weight: 500; color: var(--gray); border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+  th, td { padding: 13px 1px; font-size: 16px; text-align: right; }
+  th { font-size: 13px; font-weight: 500; color: var(--gray); border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
   td { border-bottom: 1px solid var(--line); }
-  th:first-child, td:first-child { text-align: left; font-weight: 700; }
-  th:last-child, td:last-child { width: 84px; }
+  /* 품종 이름은 라벨이라 조금 작아도 읽힌다. 숫자 넉 줄이 들어갈 자리를 벌어 준다. */
+  th:first-child, td:first-child { text-align: left; font-weight: 700; font-size: 15px; }
+  td.vol { color: var(--gray); }        /* 물량은 가격과 결이 달라 흐리게 */
   tbody tr { cursor: pointer; }
   tr.on td { background: var(--soft); }
   tr.on td:first-child::before { content: "▸ "; }
@@ -583,7 +584,7 @@ function tableHTML(kinds) {
     // 그날 경매에 없던 품종도 줄은 남긴다. 빠지면 버튼 목록과 어긋난다.
     if (!v) {
       return "<tr data-row='" + k + "'" + (k === state.kind ? ' class="on"' : "") + "><td>" + flatName(k) +
-             '</td><td colspan="2" class="flat">경매 없음</td></tr>';
+             '</td><td colspan="3" class="flat">경매 없음</td></tr>';
     }
     var c = change(k);
     var cls = "flat", txt = "―";
@@ -593,15 +594,17 @@ function tableHTML(kinds) {
     }
     // 단위가 다른 품종(홍고추는 kg)만 이름 뒤에 밝힌다. 안 그러면 싼 값으로 오해한다.
     var name = flatName(k) + (v.unit !== "근" ? ' <i>' + v.unit + "</i>" : "");
-    // 비교에 필요한 건 평균과 등락이다. 최고·최저는 품종을 고르면 위에 크게 나온다.
+    // 가격 둘을 붙여 두고, 성격이 다른 물량은 맨 끝에 둔다.
+    // 최고·최저는 품종을 고르면 위에 크게 나오므로 표에는 넣지 않는다.
     return "<tr data-row='" + k + "'" + (k === state.kind ? ' class="on"' : "") + "><td>" +
-           name + "</td><td>" + won(v.avg) + '</td><td class="' + cls + '">' + txt + "</td></tr>";
+           name + "</td><td>" + won(v.avg) + '</td><td class="' + cls + '">' + txt +
+           '</td><td class="vol">' + won(v.volume) + "</td></tr>";
   }).join("");
 
-  return "<table><thead><tr><th>품종</th><th>1근당 평균가</th><th>등락</th></tr></thead>" +
+  return "<table><thead><tr><th>품종</th><th>평균가</th><th>등락</th><th>물량</th></tr></thead>" +
          "<tbody>" + rows + "</tbody></table>" +
          '<p class="unit-note">줄을 누르면 그 품종의 최고·최저와 그래프를 봅니다.<br>' +
-         "<i>kg</i> 표시가 붙은 홍고추만 kg당 가격입니다.</p>";
+         "값은 1근당 가격과 근 단위 물량입니다. <i>kg</i> 표시가 붙은 홍고추만 kg입니다.</p>";
 }
 
 function flowHTML() {

@@ -65,19 +65,22 @@ kinds.forEach((k) => {
   check(`${k} (${lines.length}줄)`, w + 8, cell);   // 좌우 padding 4px씩
 });
 
-console.log("\n-- 표 3칸 --");
-// 품종칸은 남는 폭, 평균가·등락은 내용에 맞춘다
+console.log("\n-- 표 4칸 (품종·평균가·등락·물량) --");
 const last = m.state.dates[m.state.dates.length - 1];
-let maxName = 0, maxAvg = 0, maxDiff = 0;
+let maxName = 0, maxAvg = 0, maxDiff = 0, maxVol = 0;
 kinds.forEach((k) => {
-  maxName = Math.max(maxName, textWidth(m.flatName(k), 18));
   const v = m.state.days[last][k];
-  if (v) maxAvg = Math.max(maxAvg, textWidth(v.avg.toLocaleString("ko-KR"), 18));
+  // kg 품종은 이름 뒤에 배지가 붙는다
+  maxName = Math.max(maxName, textWidth(m.flatName(k), 15) + (v && v.unit !== "근" ? 26 : 0));
+  if (v) {
+    maxAvg = Math.max(maxAvg, textWidth(v.avg.toLocaleString("ko-KR"), 16));
+    maxVol = Math.max(maxVol, textWidth((v.volume || 0).toLocaleString("ko-KR"), 16));
+  }
   const c = m.change(k);
-  if (c) maxDiff = Math.max(maxDiff, textWidth("▲" + Math.abs(c.diff).toLocaleString("ko-KR"), 18));
+  if (c) maxDiff = Math.max(maxDiff, textWidth("▲" + Math.abs(c.diff).toLocaleString("ko-KR"), 16));
 });
-console.log(`  품종 ${maxName}px · 평균가 ${maxAvg}px · 등락 ${maxDiff}px`);
-check("표 한 줄 합계", maxName + maxAvg + maxDiff + 12, BODY);
+console.log(`  품종 ${maxName}px · 평균가 ${maxAvg}px · 등락 ${maxDiff}px · 물량 ${maxVol}px`);
+check("표 한 줄 합계", maxName + maxAvg + maxDiff + maxVol + 8, BODY);   // 칸 여백 1px씩
 
 console.log("\n-- 오늘 값 (큰 숫자) --");
 const v = m.state.days[last][m.state.kind];
