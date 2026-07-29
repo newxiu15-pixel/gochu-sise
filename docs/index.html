@@ -171,14 +171,15 @@
     padding: 10px 14px;
     border: 1px solid var(--line);
     border-top: 0;
-    border-radius: 0 0 10px 10px;
     background: var(--soft);
     font-size: 15px;
     color: var(--gray);
     display: flex;
     justify-content: space-between;
   }
-  .count b { color: var(--ink); }
+  .count + .count { border-top: 1px solid var(--line); }
+  .count.last { border-radius: 0 0 10px 10px; }
+  .count b { color: var(--ink); font-size: 16px; }
 
   .empty {
     padding: 26px 16px;
@@ -561,14 +562,17 @@ function quadHTML(kind, days) {
 
   var span = RANGES.filter(function (r) { return r.key === days; })[0];
   var label = span ? span.label : days + "일";
+  var unit = s[s.length - 1][2].unit;
+  var vol = s.reduce(function (a, x) { return a + (x[2].volume || 0); }, 0);
 
-  // 가격 셋은 나란히, 경매 횟수는 성격이 달라 아래 단으로
+  // 가격 셋은 나란히, 규모(횟수·물량)는 성격이 달라 아래 단으로 내린다
   return '<div class="quad">' +
     "<div><b>" + won(mean) + "</b><span>평균</span></div>" +
     "<div><b>" + won(highs.length ? Math.max.apply(null, highs) : null) + "</b><span>최고</span></div>" +
     "<div><b>" + won(lows.length ? Math.min.apply(null, lows) : null) + "</b><span>최저</span></div>" +
     "</div>" +
-    '<div class="count"><span>' + label + "간 이 품종이 나온 경매</span><b>" + s.length + "번</b></div>";
+    '<div class="count"><span>' + label + " 경매 횟수</span><b>" + s.length + "번</b></div>" +
+    '<div class="count last"><span>' + label + " 거래 물량</span><b>" + won(vol) + " " + unit + "</b></div>";
 }
 
 // ── 그날 전 품종 ───────────────────────────────────────────
